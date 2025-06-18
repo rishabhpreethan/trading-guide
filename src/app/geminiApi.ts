@@ -67,8 +67,9 @@ export async function analyzeChartWithGemini({ image, prompt }: { image: File; p
     const text = await result.response.text();
     console.log("Analysis complete");
     return text || "No analysis returned from Gemini.";
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Gemini Vision API error:", err);
-    throw new Error("Gemini Vision API error: " + (err?.message || err));
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    throw new Error("Gemini Vision API error: " + errorMessage);
   }
 }

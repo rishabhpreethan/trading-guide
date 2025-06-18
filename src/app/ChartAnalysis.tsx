@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { analyzeChartWithGemini } from "./geminiApi";
 import ReactMarkdown from "react-markdown";
 
@@ -18,6 +18,8 @@ interface AnalysisResults {
   finalSuggestion?: string;
 }
 
+type TabType = 'overall' | '4h' | '1h' | '15min' | '5min';
+
 const ChartAnalysis: React.FC = () => {
   const [images, setImages] = useState<ChartImages>({
     chart4h: null,
@@ -28,7 +30,21 @@ const ChartAnalysis: React.FC = () => {
   const [results, setResults] = useState<AnalysisResults>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeStep, setActiveStep] = useState<number>(0); // Track which step of the analysis we're on
+  // const [activeStep, setActiveStep] = useState<number>(0); // Track which step of the analysis we're on
+  const [activeTab, setActiveTab] = useState<TabType>('overall'); // Default to overall tab
+  const [contentHeight, setContentHeight] = useState<string>("calc(100vh - 200px)"); // Default height
+  
+  // Set the content height based on viewport
+  useEffect(() => {
+    const updateHeight = () => {
+      // Subtract header height and some padding
+      setContentHeight(`calc(100vh - 200px)`);
+    };
+    
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    return () => window.removeEventListener('resize', updateHeight);
+  }, []);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, timeframe: keyof ChartImages) => {
     if (e.target.files && e.target.files[0]) {
@@ -97,10 +113,10 @@ const ChartAnalysis: React.FC = () => {
       // Final suggestion (combine all)
       finalSuggestion = await analyzeChartWithGemini({
         image: images.chart4h || images.chart1h || images.chart15m || images.chart5m!,
-        prompt: `Given the following analyses:\n4H: ${analysis4h}\n1H: ${analysis1h}\n15min: ${analysis15m}\n5min: ${analysis5m}\nSuggest a final trade action or strategy, and summarize the reasoning.`
+        prompt: `Given the following analyses:\n4H: ${analysis4h}\n1H: ${analysis1h}\n15min: ${analysis15m}\n5min: ${analysis5m}\n\nProvide a final trading recommendation with a clear structure. Your response MUST follow this exact format:\n\nTrade Action: [Clear action to take - Buy, Sell, or No Trade]\n\nReasoning: [Detailed explanation of why this trade action is recommended, including key support/resistance levels, trend analysis, and other relevant factors]\n\nPosition Details: [If recommending a trade, provide specific entry price or range, stop loss level, and take profit target(s). If no trade is recommended, explain what conditions would need to change for a trade setup to become valid]`
       });
       setResults(r => ({ ...r, finalSuggestion }));
-    } catch (err: any) {
+    } catch {
       setError("Failed to analyze charts. Please check your images and network, or try again.");
     } finally {
       setLoading(false);
@@ -119,9 +135,9 @@ const ChartAnalysis: React.FC = () => {
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left side - Image uploads */}
-        <div className="bg-gray-50 dark:bg-neutral-800 rounded-xl p-6 shadow-sm lg:col-span-1">
+        <div className="bg-gray-50 dark:bg-neutral-800 rounded-xl p-6 shadow-sm lg:col-span-1 overflow-hidden flex flex-col" style={{ height: contentHeight }}>
           <h3 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-200">Upload Chart Images</h3>
-          <form className="flex flex-col gap-5" onSubmit={e => { e.preventDefault(); handleAnalyze(); }}>
+          <form className="flex flex-col gap-5 overflow-y-auto flex-1 pr-2" onSubmit={e => { e.preventDefault(); handleAnalyze(); }}>
             {/* 4H Chart */}
             <div className="relative">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">4H Chart</label>
@@ -226,6 +242,64 @@ const ChartAnalysis: React.FC = () => {
         <div className="bg-gray-50 dark:bg-neutral-800 rounded-xl p-6 shadow-sm lg:col-span-2">
           <h3 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-200">Analysis Results</h3>
           
+          {/* Tabs */}
+          {(results.analysis4h || results.analysis1h || results.analysis15m || results.analysis5m || results.finalSuggestion) && (
+            <div className="mb-4 border-b border-gray-200 dark:border-gray-700">
+              <ul className="flex flex-wrap -mb-px text-sm font-medium text-center">
+                <li className="mr-2">
+                  <button
+                    onClick={() => setActiveTab('overall')}
+                    className={`inline-block p-4 rounded-t-lg ${activeTab === 'overall' ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400' : 'hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'}`}
+                  >
+                    Overall Suggestion
+                  </button>
+                </li>
+                {results.analysis4h && (
+                  <li className="mr-2">
+                    <button
+                      onClick={() => setActiveTab('4h')}
+                      className={`inline-block p-4 rounded-t-lg ${activeTab === '4h' ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400' : 'hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'}`}
+                    >
+                      4H Analysis
+                    </button>
+                  </li>
+                )}
+                {results.analysis1h && (
+                  <li className="mr-2">
+                    <button
+                      onClick={() => setActiveTab('1h')}
+                      className={`inline-block p-4 rounded-t-lg ${activeTab === '1h' ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400' : 'hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'}`}
+                    >
+                      1H Analysis
+                    </button>
+                  </li>
+                )}
+                {results.analysis15m && (
+                  <li className="mr-2">
+                    <button
+                      onClick={() => setActiveTab('15min')}
+                      className={`inline-block p-4 rounded-t-lg ${activeTab === '15min' ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400' : 'hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'}`}
+                    >
+                      15min Analysis
+                    </button>
+                  </li>
+                )}
+                {results.analysis5m && (
+                  <li className="mr-2">
+                    <button
+                      onClick={() => setActiveTab('5min')}
+                      className={`inline-block p-4 rounded-t-lg ${activeTab === '5min' ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400' : 'hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'}`}
+                    >
+                      5min Analysis
+                    </button>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+          
+          <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 350px)' }}>
+          
           {error && (
             <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 dark:bg-red-900/20 dark:border-red-400">
               <div className="flex items-center">
@@ -250,70 +324,98 @@ const ChartAnalysis: React.FC = () => {
             </div>
           )}
           
-          {(results.analysis4h || results.analysis1h || results.analysis15m || results.analysis5m) && (
-            <div>
-              {/* Timeframe Analysis Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                {/* 4H Analysis */}
-                {results.analysis4h && (
-                  <div className="bg-white dark:bg-neutral-700 rounded-lg p-4 shadow-sm h-full">
-                    <h4 className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2">4H Analysis</h4>
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      <ReactMarkdown>
-                        {results.analysis4h}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
-                )}
-                
-                {/* 1H Analysis */}
-                {results.analysis1h && (
-                  <div className="bg-white dark:bg-neutral-700 rounded-lg p-4 shadow-sm h-full">
-                    <h4 className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2">1H Analysis</h4>
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      <ReactMarkdown>
-                        {results.analysis1h}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
-                )}
-                
-                {/* 15min Analysis */}
-                {results.analysis15m && (
-                  <div className="bg-white dark:bg-neutral-700 rounded-lg p-4 shadow-sm h-full">
-                    <h4 className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2">15min Analysis</h4>
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      <ReactMarkdown>
-                        {results.analysis15m}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
-                )}
-                
-                {/* 5min Analysis */}
-                {results.analysis5m && (
-                  <div className="bg-white dark:bg-neutral-700 rounded-lg p-4 shadow-sm h-full">
-                    <h4 className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2">5min Analysis</h4>
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      <ReactMarkdown>
-                        {results.analysis5m}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
-                )}
-              </div>
+          {/* Tab Content */}
+          {activeTab === 'overall' && results.finalSuggestion && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-5 shadow-sm">
+              <h4 className="font-semibold text-lg text-blue-800 dark:text-blue-300 mb-4">Trade Suggestion</h4>
               
-              {/* Final Suggestion - Full Width */}
-              {results.finalSuggestion && (
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-5 shadow-sm">
-                  <h4 className="font-semibold text-lg text-blue-800 dark:text-blue-300 mb-3">Trade Suggestion</h4>
-                  <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none">
-                    <ReactMarkdown>
-                      {results.finalSuggestion}
-                    </ReactMarkdown>
+              {/* Parse and structure the final suggestion */}
+              {(() => {
+                // Extract sections using regex patterns
+                const tradeActionMatch = results.finalSuggestion.match(/Trade Action:([^\n]*)/i);
+                const reasoningMatch = results.finalSuggestion.match(/Reasoning:([\s\S]*?)(?=Position Details:|$)/i);
+                const positionMatch = results.finalSuggestion.match(/Position Details:([\s\S]*?)(?=$)/i);
+                
+                const tradeAction = tradeActionMatch ? tradeActionMatch[1].trim() : "No specific trade action provided";
+                const reasoning = reasoningMatch ? reasoningMatch[1].trim() : results.finalSuggestion;
+                const positionDetails = positionMatch ? positionMatch[1].trim() : "No position details provided";
+                
+                return (
+                  <div className="space-y-6">
+                    {/* Trade Action Section */}
+                    <div className="bg-white dark:bg-neutral-700 rounded-lg p-4 border-l-4 border-blue-500 dark:border-blue-400">
+                      <h5 className="font-semibold text-blue-800 dark:text-blue-300 mb-2">Trade Action</h5>
+                      <div className="text-lg font-medium">{tradeAction}</div>
+                    </div>
+                    
+                    {/* Reasoning Section */}
+                    <div className="bg-white dark:bg-neutral-700 rounded-lg p-4">
+                      <h5 className="font-semibold text-blue-800 dark:text-blue-300 mb-2">Reasoning</h5>
+                      <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none">
+                        <ReactMarkdown>
+                          {reasoning}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                    
+                    {/* Position Details Section */}
+                    {positionMatch && (
+                      <div className="bg-white dark:bg-neutral-700 rounded-lg p-4 border-l-4 border-green-500 dark:border-green-400">
+                        <h5 className="font-semibold text-blue-800 dark:text-blue-300 mb-2">Position Details</h5>
+                        <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none">
+                          <ReactMarkdown>
+                            {positionDetails}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
+            </div>
+          )}
+          
+          {activeTab === '4h' && results.analysis4h && (
+            <div className="bg-white dark:bg-neutral-700 rounded-lg p-5 shadow-sm">
+              <h4 className="font-semibold text-blue-600 dark:text-blue-400 mb-3">4H Analysis</h4>
+              <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none">
+                <ReactMarkdown>
+                  {results.analysis4h}
+                </ReactMarkdown>
+              </div>
+            </div>
+          )}
+          
+          {activeTab === '1h' && results.analysis1h && (
+            <div className="bg-white dark:bg-neutral-700 rounded-lg p-5 shadow-sm">
+              <h4 className="font-semibold text-blue-600 dark:text-blue-400 mb-3">1H Analysis</h4>
+              <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none">
+                <ReactMarkdown>
+                  {results.analysis1h}
+                </ReactMarkdown>
+              </div>
+            </div>
+          )}
+          
+          {activeTab === '15min' && results.analysis15m && (
+            <div className="bg-white dark:bg-neutral-700 rounded-lg p-5 shadow-sm">
+              <h4 className="font-semibold text-blue-600 dark:text-blue-400 mb-3">15min Analysis</h4>
+              <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none">
+                <ReactMarkdown>
+                  {results.analysis15m}
+                </ReactMarkdown>
+              </div>
+            </div>
+          )}
+          
+          {activeTab === '5min' && results.analysis5m && (
+            <div className="bg-white dark:bg-neutral-700 rounded-lg p-5 shadow-sm">
+              <h4 className="font-semibold text-blue-600 dark:text-blue-400 mb-3">5min Analysis</h4>
+              <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none">
+                <ReactMarkdown>
+                  {results.analysis5m}
+                </ReactMarkdown>
+              </div>
             </div>
           )}
           
@@ -324,6 +426,7 @@ const ChartAnalysis: React.FC = () => {
               <p className="text-xs text-gray-400 mt-2">This may take a moment</p>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>

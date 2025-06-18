@@ -18,6 +18,8 @@ interface AnalysisResults {
   finalSuggestion?: string;
 }
 
+type AnalysisStep = '4h' | '1h' | '15min' | '5min' | 'final';
+
 type TabType = 'overall' | '4h' | '1h' | '15min' | '5min';
 
 const ChartAnalysis: React.FC = () => {
@@ -30,7 +32,8 @@ const ChartAnalysis: React.FC = () => {
   const [results, setResults] = useState<AnalysisResults>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // const [activeStep, setActiveStep] = useState<number>(0); // Track which step of the analysis we're on
+  const [currentStep, setCurrentStep] = useState<AnalysisStep | null>(null);
+  const [progress, setProgress] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<TabType>('overall'); // Default to overall tab
   const [contentHeight, setContentHeight] = useState<string>("calc(100vh - 200px)"); // Default height
   
@@ -59,6 +62,9 @@ const ChartAnalysis: React.FC = () => {
     setLoading(true);
     setError(null);
     setResults({});
+    setProgress(0);
+    setCurrentStep(null);
+    
     try {
       let analysis4h = "";
       let analysis1h = "";
@@ -67,6 +73,7 @@ const ChartAnalysis: React.FC = () => {
       let finalSuggestion = "";
 
       // 4H chart analysis
+      setCurrentStep('4h');
       if (images.chart4h) {
         analysis4h = await analyzeChartWithGemini({
           image: images.chart4h,
@@ -76,8 +83,10 @@ const ChartAnalysis: React.FC = () => {
         analysis4h = "No 4h chart uploaded.";
       }
       setResults(r => ({ ...r, analysis4h }));
+      setProgress(20);
 
       // 1H chart analysis
+      setCurrentStep('1h');
       if (images.chart1h) {
         analysis1h = await analyzeChartWithGemini({
           image: images.chart1h,
@@ -87,8 +96,10 @@ const ChartAnalysis: React.FC = () => {
         analysis1h = "No 1h chart uploaded.";
       }
       setResults(r => ({ ...r, analysis1h }));
+      setProgress(40);
 
       // 15min chart analysis
+      setCurrentStep('15min');
       if (images.chart15m) {
         analysis15m = await analyzeChartWithGemini({
           image: images.chart15m,
@@ -98,8 +109,10 @@ const ChartAnalysis: React.FC = () => {
         analysis15m = "No 15min chart uploaded.";
       }
       setResults(r => ({ ...r, analysis15m }));
+      setProgress(60);
 
       // 5min chart analysis
+      setCurrentStep('5min');
       if (images.chart5m) {
         analysis5m = await analyzeChartWithGemini({
           image: images.chart5m,
@@ -109,17 +122,21 @@ const ChartAnalysis: React.FC = () => {
         analysis5m = "No 5min chart uploaded.";
       }
       setResults(r => ({ ...r, analysis5m }));
+      setProgress(80);
 
       // Final suggestion (combine all)
+      setCurrentStep('final');
       finalSuggestion = await analyzeChartWithGemini({
         image: images.chart4h || images.chart1h || images.chart15m || images.chart5m!,
         prompt: `Given the following analyses:\n4H: ${analysis4h}\n1H: ${analysis1h}\n15min: ${analysis15m}\n5min: ${analysis5m}\n\nProvide a final trading recommendation with a clear structure. Your response MUST follow this exact format:\n\nTrade Action: [Clear action to take - Buy, Sell, or No Trade]\n\nReasoning: [Detailed explanation of why this trade action is recommended, including key support/resistance levels, trend analysis, and other relevant factors]\n\nPosition Details: [If recommending a trade, provide specific entry price or range, stop loss level, and take profit target(s). If no trade is recommended, explain what conditions would need to change for a trade setup to become valid]`
       });
       setResults(r => ({ ...r, finalSuggestion }));
+      setProgress(100);
     } catch {
       setError("Failed to analyze charts. Please check your images and network, or try again.");
     } finally {
       setLoading(false);
+      setCurrentStep(null);
     }
   };
 
@@ -217,6 +234,36 @@ const ChartAnalysis: React.FC = () => {
                 </div>
               </div>
             </div>
+            
+            {/* Progress Bar */}
+            {loading && (
+              <div className="mt-4 mb-2">
+                <div className="relative pt-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200">
+                        {currentStep === '4h' && 'Analyzing 4h Chart...'}
+                        {currentStep === '1h' && 'Analyzing 1h Chart...'}
+                        {currentStep === '15min' && 'Analyzing 15min Chart...'}
+                        {currentStep === '5min' && 'Analyzing 5min Chart...'}
+                        {currentStep === 'final' && 'Generating Final Suggestion...'}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-semibold inline-block text-blue-600">
+                        {progress}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200">
+                    <div 
+                      style={{ width: `${progress}%`, transition: 'width 0.5s ease-in-out' }} 
+                      className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-blue-500 to-indigo-600">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             
             <button 
               type="submit" 

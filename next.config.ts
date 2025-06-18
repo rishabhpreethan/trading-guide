@@ -1,8 +1,13 @@
 import type { NextConfig } from "next";
 
+// For development mode
+const isDev = process.env.NODE_ENV === 'development';
+
 const nextConfig: NextConfig = {
-  output: 'export',
-  basePath: '/trading-guide',
+  // Only use export for production builds
+  ...(isDev ? {} : { output: 'export' }),
+  // Only use basePath for production
+  ...(isDev ? {} : { basePath: '/trading-guide' }),
   images: {
     unoptimized: true,
   },

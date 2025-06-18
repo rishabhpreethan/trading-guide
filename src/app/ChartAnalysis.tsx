@@ -77,7 +77,15 @@ const ChartAnalysis: React.FC = () => {
       if (images.chart4h) {
         analysis4h = await analyzeChartWithGemini({
           image: images.chart4h,
-          prompt: "Analyze this 4-hour trading chart image. Summarize the market structure, trend, and any key levels or patterns."
+          prompt: `Analyze this 4-hour trading chart using the Fib-EMA Confluence Trend Trading strategy. Please include:
+
+1. Trend Identification: Determine if there's a clear uptrend (higher highs/lows) or downtrend (lower lows/highs).
+2. EMA Analysis: Look for the 50 EMA and 200 EMA positions and slopes. In an uptrend, 50 EMA should be above 200 EMA; in a downtrend, 50 EMA should be below 200 EMA.
+3. Fibonacci Retracement Levels: Identify key Fibonacci levels (especially 0.382, 0.5, 0.618) where price might find support/resistance during retracements.
+4. Confluence Zones: Highlight any areas where Fibonacci levels align with EMAs, creating potential "sweet spots" for trade entries.
+5. Candlestick Patterns: Note any significant reversal patterns at these confluence zones.
+
+Provide a comprehensive analysis of the medium-term trend and potential trade opportunities.`
         });
       } else {
         analysis4h = "No 4h chart uploaded.";
@@ -90,7 +98,16 @@ const ChartAnalysis: React.FC = () => {
       if (images.chart1h) {
         analysis1h = await analyzeChartWithGemini({
           image: images.chart1h,
-          prompt: `Analyze this 1-hour trading chart. Consider the 4H context: ${analysis4h}. What does the 1H chart show?`
+          prompt: `Analyze this 1-hour trading chart using the Fib-EMA Confluence Trend Trading strategy, while considering the 4H context: ${analysis4h}.
+
+Please include:
+1. Alignment with 4H Trend: Does the 1H trend align with or contradict the 4H analysis?
+2. EMA Analysis: Look for the 20 EMA and 50 EMA positions and slopes. Are they confirming the trend identified on the 4H chart?
+3. Fibonacci Retracement Levels: Identify key Fibonacci levels where price might find support/resistance.
+4. Confluence Zones: Highlight any areas where Fibonacci levels align with EMAs, creating potential "sweet spots" for trade entries.
+5. Candlestick Patterns: Note any bullish patterns (engulfing, hammer, morning star) or bearish patterns (engulfing, shooting star, evening star) at confluence zones.
+
+Focus on how this timeframe supports or contradicts the larger trend identified in the 4H analysis.`
         });
       } else {
         analysis1h = "No 1h chart uploaded.";
@@ -103,7 +120,16 @@ const ChartAnalysis: React.FC = () => {
       if (images.chart15m) {
         analysis15m = await analyzeChartWithGemini({
           image: images.chart15m,
-          prompt: `Analyze this 15-minute trading chart. Consider the 1H context: ${analysis1h}. What does the 15min chart show?`
+          prompt: `Analyze this 15-minute trading chart using the Fib-EMA Confluence Trend Trading strategy, while considering the 1H context: ${analysis1h}.
+
+Please include:
+1. Alignment with Higher Timeframes: Does the 15min chart align with the trends identified in the 1H and 4H analyses?
+2. EMA Analysis: Look for the 20 EMA and 50 EMA positions and their relationship to price action.
+3. Fibonacci Retracement Levels: Identify any key Fibonacci levels that are currently relevant.
+4. Potential Entry Points: Based on the confluence of Fibonacci levels and EMAs, identify any immediate entry opportunities.
+5. Short-term Price Action: Note any significant candlestick patterns forming at key levels.
+
+Focus on more immediate trading opportunities while respecting the larger trend context.`
         });
       } else {
         analysis15m = "No 15min chart uploaded.";
@@ -116,7 +142,16 @@ const ChartAnalysis: React.FC = () => {
       if (images.chart5m) {
         analysis5m = await analyzeChartWithGemini({
           image: images.chart5m,
-          prompt: `Analyze this 5-minute trading chart. Consider the 15min context: ${analysis15m}. What does the 5min chart show?`
+          prompt: `Analyze this 5-minute trading chart using the Fib-EMA Confluence Trend Trading strategy, while considering the 15min context: ${analysis15m}.
+
+Please include:
+1. Immediate Price Action: Analyze the very short-term price movements and how they relate to the larger timeframe trends.
+2. EMA Analysis: Look for the 20 EMA and 50 EMA positions and any immediate interactions with price.
+3. Entry/Exit Precision: Identify precise entry points, stop loss levels, and take profit targets based on the confluence of Fibonacci levels and EMAs.
+4. Candlestick Confirmation: Note any immediate confirmation or reversal patterns that could trigger trade execution.
+5. Risk Management: Suggest appropriate stop loss placement based on the recent price action.
+
+Focus on fine-tuning entry and exit points for trades that align with the larger timeframe analyses.`
         });
       } else {
         analysis5m = "No 5min chart uploaded.";
@@ -128,7 +163,17 @@ const ChartAnalysis: React.FC = () => {
       setCurrentStep('final');
       finalSuggestion = await analyzeChartWithGemini({
         image: images.chart4h || images.chart1h || images.chart15m || images.chart5m!,
-        prompt: `Given the following analyses:\n4H: ${analysis4h}\n1H: ${analysis1h}\n15min: ${analysis15m}\n5min: ${analysis5m}\n\nProvide a final trading recommendation with a clear structure. Your response MUST follow this exact format:\n\nTrade Action: [Clear action to take - Buy, Sell, or No Trade]\n\nReasoning: [Detailed explanation of why this trade action is recommended, including key support/resistance levels, trend analysis, and other relevant factors]\n\nPosition Details: [If recommending a trade, provide specific entry price or range, stop loss level, and take profit target(s). If no trade is recommended, explain what conditions would need to change for a trade setup to become valid]`
+        prompt: `Given the following analyses based on the Fib-EMA Confluence Trend Trading strategy:\n4H: ${analysis4h}\n1H: ${analysis1h}\n15min: ${analysis15m}\n5min: ${analysis5m}\n\nProvide a final trading recommendation that synthesizes all timeframes. Your response MUST follow this exact format:\n\nTrade Action: [Clear action to take - Buy, Sell, or No Trade]\n\nReasoning: [Detailed explanation of why this trade action is recommended, including:
+- Overall trend direction across timeframes
+- Key Fibonacci retracement levels and their confluence with EMAs
+- Relevant candlestick patterns confirming the trade
+- How this aligns with the Fib-EMA Confluence Trend Trading strategy]\n\nPosition Details: [If recommending a trade, provide:
+- Specific entry price or range
+- Stop loss level (place below/above the reversal candlestick and below/above the confluent Fibonacci/EMA level)
+- Take profit target(s) (consider previous swing high/low or Fibonacci extension levels)
+- Risk-reward ratio (aim for minimum 1:2 or 1:3)
+
+If no trade is recommended, explain what conditions would need to change for a valid Fib-EMA confluence setup to form]`
       });
       setResults(r => ({ ...r, finalSuggestion }));
       setProgress(100);

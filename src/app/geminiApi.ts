@@ -2,7 +2,7 @@
 // WARNING: For production, move API calls and secrets to a backend endpoint or serverless function!
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const GEMINI_API_KEY = "AIzaSyAqwpnpyu9v2e7e6eTxHCUaK20EA-NL5YI";
+const GEMINI_API_KEY = "AIzaSyAE8p_vWov7LUqDW-V4o6NT5hXoSg8A8tk";
 // Using gemini-1.5-flash as gemini-pro-vision was deprecated on July 12, 2024
 const MODEL_NAME = "gemini-1.5-flash";
 

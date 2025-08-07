@@ -2,6 +2,51 @@
 import React, { useState, useEffect } from "react";
 import { analyzeChartWithGemini } from "./geminiApi";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from 'remark-gfm';
+
+// Custom components for markdown rendering
+const components = {
+  table: ({ node, ...props }: any) => (
+    <div className="overflow-x-auto mb-4">
+      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700" {...props} />
+    </div>
+  ),
+  thead: ({ node, ...props }: any) => (
+    <thead className="bg-gray-50 dark:bg-gray-800" {...props}>
+      {props.children}
+    </thead>
+  ),
+  th: ({ node, isHeader, ...props }: any) => (
+    <th 
+      className={`px-6 py-3 text-left text-sm font-medium ${
+        isHeader 
+          ? 'text-gray-500 dark:text-gray-300 uppercase tracking-wider' 
+          : 'text-gray-900 dark:text-gray-100'
+      }`}
+      {...props}
+    >
+      {props.children}
+    </th>
+  ),
+  tbody: ({ node, ...props }: any) => (
+    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700" {...props}>
+      {props.children}
+    </tbody>
+  ),
+  tr: ({ node, ...props }: any) => (
+    <tr className="hover:bg-gray-50 dark:hover:bg-gray-800" {...props}>
+      {props.children}
+    </tr>
+  ),
+  td: ({ node, ...props }: any) => (
+    <td 
+      className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300" 
+      {...props}
+    >
+      {props.children}
+    </td>
+  ),
+};
 
 interface ChartImages {
   chart4h: File | null;
@@ -172,17 +217,30 @@ Your analysis should focus on establishing overall market structure and primary 
       if (images.chart1h) {
         analysis1h = await analyzeChartWithGemini({
           image: images.chart1h,
-          prompt: `Analyze this 1-hour chart using the Fib-RSI Confluence Strategy while considering the 4h context:
+          prompt: `Analyze this 1-hour chart for BOTH swing and intraday opportunities while considering 4h context:
 
-1. Identify if price is at/approaching any significant Fibonacci level from 4h analysis
-2. Note any new 1h Fibonacci levels that align with 4h levels
-3. Check if RSI direction confirms the 4h trend bias
-4. Identify potential entry zones where Fibonacci levels create confluence
-5. Determine if this timeframe is setting up for a potential trade opportunity
+## SWING TRADE SETUP (2-7 days)
+1. Identify if price is at/approaching significant Fibonacci levels from 4h timeframe
+2. Check if 1h RSI aligns with 4h trend bias for multi-day holds
+3. Look for 1h confluence zones that support 4h structure
+4. Assess if current 1h pattern supports swing trade entries
 
-The 4h analysis found: ${analysis4h.substring(0, 300)}...
+## INTRADAY TRADE SETUP (Same day)
+1. Identify 1h support/resistance levels for same-day trading
+2. Check for 1h RSI conditions suitable for 4-8 hour moves (RSI 35-65 range)
+3. Look for 1h breakout/breakdown patterns independent of 4h bias
+4. Assess immediate 1h Fibonacci retracements for intraday entries
+5. Identify 1h trend changes that could offer same-day opportunities
 
-Focus specifically on finding entry zones that align with the 4h structure, paying attention to RSI reversals (30-40 for bullish, 60-70 for bearish).`
+## KEY LEVELS IDENTIFICATION
+- List specific support levels with exact prices
+- List specific resistance levels with exact prices
+- Identify 1h Fibonacci levels (0.382, 0.5, 0.618) with prices
+- Note any 1h trend line breaks or formations
+
+4h context: ${analysis4h.substring(0, 200)}...
+
+Provide clear price levels and distinguish between setups that work for swing trades vs intraday trades. Focus on actionable levels that can be monitored throughout the trading day.`
         });
       } else {
         analysis1h = "No 1h chart uploaded.";
@@ -195,18 +253,27 @@ Focus specifically on finding entry zones that align with the 4h structure, payi
       if (images.chart15m) {
         analysis15m = await analyzeChartWithGemini({
           image: images.chart15m,
-          prompt: `Analyze this 15-minute chart using the Fib-RSI Confluence Strategy while considering higher timeframe context:
+          prompt: `Analyze this 15-minute chart for BOTH intraday and scalp trading opportunities while considering higher timeframe context:
 
-1. Identify any clear candlestick patterns at Fibonacci confluence zones
-2. Check if RSI confirms the momentum in the expected direction
-3. Look for any bearish/bullish divergence on RSI
-4. Suggest precise entry point, stop loss (below/above relevant Fib level), and take profit targets
-5. Calculate the Risk:Reward ratio and only recommend the trade if it's at least 1:2
+## INTRADAY TRADE ANALYSIS (Same day holds)
+1. Identify clear candlestick patterns at Fibonacci confluence zones suitable for 2-8 hour holds
+2. Check if RSI (30-70 range) confirms momentum for intraday moves
+3. Look for any bearish/bullish divergence on RSI that could signal 4-6 hour reversals
+4. Suggest entry points with stops at nearby support/resistance for same-day exits
+5. Calculate Risk:Reward for targets 20-50 pips away
 
-The 4h analysis found: ${analysis4h.substring(0, 200)}...
-The 1h analysis found: ${analysis1h.substring(0, 200)}...
+## SCALP TRADE ANALYSIS (Quick moves)
+1. Identify immediate support/resistance levels for 15-60 minute moves
+2. Check for RSI oversold (<30) or overbought (>70) conditions for quick reversals
+3. Look for breakout patterns that could give 10-30 pip moves
+4. Suggest tight entry zones with 5-15 pip stops
+5. Calculate Risk:Reward for quick 10-25 pip targets
 
-Focus specifically on fine-tuning entry timing and precise stop-loss placement. Look for short-term Fib levels from recent 1h swings and immediate RSI confirmation signals.`
+Higher timeframe context:
+4h analysis: ${analysis4h.substring(0, 200)}...
+1h analysis: ${analysis1h.substring(0, 200)}...
+
+Provide specific price levels, entry conditions, and time-based exit strategies for both trade types. Focus on actionable setups that can be taken within the next 1-4 hours.`
         });
       } else {
         analysis15m = "No 15min chart uploaded.";
@@ -219,16 +286,30 @@ Focus specifically on fine-tuning entry timing and precise stop-loss placement. 
       if (images.chart5m) {
         analysis5m = await analyzeChartWithGemini({
           image: images.chart5m,
-          prompt: `Analyze this 5-minute chart using the Fib-RSI Confluence Strategy while considering the 15min context: ${analysis15m.substring(0, 300)}...
+          prompt: `Analyze this 5-minute chart for SCALP TRADING execution with precise entry/exit details:
 
-1. Identify exact price levels for entry based on short-term price reaction at Fibonacci levels
-2. Check if current RSI reading confirms the momentum seen in higher timeframes
-3. Look for any very recent RSI divergences that could signal short-term reversals
-4. Provide exact stop loss placement (specify price) below/above the nearest key Fibonacci level
-5. Provide exact take profit targets (specify prices) at the next significant Fibonacci levels
-6. Describe the specific candlestick pattern or price action that should trigger entry execution
+## IMMEDIATE SCALP OPPORTUNITIES (5-30 minutes)
+1. Identify EXACT entry prices based on current price action and micro support/resistance
+2. Check current RSI reading and identify if it's in scalp-friendly zones (oversold <25, overbought >75)
+3. Look for immediate reversal signals: hammer/doji at support, shooting star/doji at resistance
+4. Provide EXACT stop loss prices (typically 3-8 pips from entry)
+5. Provide EXACT take profit targets at nearest resistance/support (typically 8-20 pips)
+6. Describe the SPECIFIC candlestick pattern or price action happening RIGHT NOW
 
-Focus ONLY on precise execution details for the trade setup identified in the higher timeframes. This should be the final tactical guidance for trade execution.`
+## MICRO TREND ANALYSIS
+- Current 5-minute trend direction
+- Last 3 candles pattern significance
+- Volume confirmation (if visible)
+- Any immediate breakout/breakdown levels
+
+## EXECUTION TIMING
+- Best entry time within next 15-30 minutes
+- Market session consideration (volatility expectations)
+- Any upcoming support/resistance tests
+
+15min context: ${analysis15m.substring(0, 200)}...
+
+Focus on trades that can be executed IMMEDIATELY with clear 5-15 minute exit strategies. Provide specific price alerts and exact timing for entry execution.`
         });
       } else {
         analysis5m = "No 5min chart uploaded.";
@@ -240,7 +321,7 @@ Focus ONLY on precise execution details for the trade setup identified in the hi
       setCurrentStep('final');
       finalSuggestion = await analyzeChartWithGemini({
         image: images.chart4h || images.chart1h || images.chart15m || images.chart5m!,
-        prompt: `Given the following analyses based on the multi-timeframe Fib-RSI Confluence Strategy:\n4H: ${analysis4h}\n1H: ${analysis1h}\n15min: ${analysis15m}\n5min: ${analysis5m}\n\nProvide a final trading recommendation that synthesizes all timeframes. Your response MUST follow this exact format with clear visual indicators:\n\n## CHECKLIST EVALUATION\n\n| Criteria | Status | Details |\n|---------|--------|---------|\n| **1. DIRECTIONAL ALIGNMENT** | PASS or FAIL | |\n| 4h RSI trend bias | PASS or FAIL | [DETAIL] |\n| 1h RSI confirmation | PASS or FAIL | [DETAIL] |\n| 15m RSI momentum | PASS or FAIL | [DETAIL] |\n| **2. FIBONACCI STRUCTURE** | PASS or FAIL | |\n| 4h Fibonacci level | PASS or FAIL | [DETAIL] |\n| 1h Fibonacci confirmation | PASS or FAIL | [DETAIL] |\n| 15m price action at confluence | PASS or FAIL | [DETAIL] |\n| **3. ENTRY CONFIRMATION** | PASS or FAIL | |\n| 15m candlestick pattern | PASS or FAIL | [DETAIL] |\n| RSI momentum confirmation | PASS or FAIL | [DETAIL] |\n| Risk:Reward ratio >= 1:2 | PASS or FAIL | [DETAIL] |\n\n## TRADE RECOMMENDATION\n\n**TRADE ACTION: [BUY/SELL/NO TRADE]**\n\n## TRADE PARAMETERS\n\nENTRY: [Exact price or tight range]\nSTOP LOSS: [Exact price] (Based on [relevant Fibonacci level])\nTAKE PROFIT 1: [Exact price] (Based on [Fibonacci level])\nTAKE PROFIT 2: [Exact price] (Based on [Fibonacci level])\nTAKE PROFIT 3: [Exact price] (Based on [Fibonacci level])\nRISK:REWARD RATIO: [Precise calculation]\nPOSITION SIZE RECOMMENDATION: [Based on stop distance]\n\n## REASONING\n[Concise explanation of the trade recommendation based on the checklist evaluation]\n\n## VISUAL MARKERS\n- **Fibonacci Confluence Zones**: [Specific price levels]\n- **Entry Trigger Pattern**: [Specific candle pattern to watch for]\n- **RSI Confirmation Points**: [Specific RSI levels across timeframes]\n\nIf recommending NO TRADE, clearly highlight which checklist items FAILED and explain what specific conditions would need to change for a valid setup.`
+        prompt: `Given the following analyses based on the multi-timeframe Fib-RSI Confluence Strategy:\n4H: ${analysis4h}\n1H: ${analysis1h}\n15min: ${analysis15m}\n5min: ${analysis5m}\n\nProvide a comprehensive trading recommendation that covers ALL possible trade types. Your response MUST follow this exact format:\n\n## 🎯 PRIMARY TRADE OPPORTUNITY\n\n### SWING TRADE (2-7 days)\n**STATUS:** ✅ AVAILABLE / ⏳ WAIT / ❌ NOT AVAILABLE\n\n**Entry:** [Price]\n**Stop Loss:** [Price]\n**Take Profit 1:** [Price] (R:R [ratio])\n**Take Profit 2:** [Price] (R:R [ratio])\n**Timeframe:** 4H-1H confirmation needed\n\n### INTRADAY TRADE (Same day)\n**STATUS:** ✅ AVAILABLE / ⏳ WAIT / ❌ NOT AVAILABLE\n\n**Entry:** [Price]\n**Stop Loss:** [Price]\n**Take Profit 1:** [Price] (R:R [ratio])\n**Take Profit 2:** [Price] (R:R [ratio])\n**Timeframe:** 1H-15M confirmation needed\n\n### SCALP TRADE (Minutes to hours)\n**STATUS:** ✅ AVAILABLE / ⏳ WAIT / ❌ NOT AVAILABLE\n\n**Entry:** [Price]\n**Stop Loss:** [Price]\n**Take Profit 1:** [Price] (R:R [ratio])\n**Take Profit 2:** [Price] (R:R [ratio])\n**Timeframe:** 15M-5M confirmation needed\n\n## ⏰ WAITING INSTRUCTIONS\n\n### If SWING trade shows ⏳ WAIT:\n- **Wait for:** [Specific condition]\n- **Watch level:** [Specific price]\n- **Confirmation needed:** [Specific signal]\n- **Maximum wait time:** [Time period]\n\n### If INTRADAY trade shows ⏳ WAIT:\n- **Wait for:** [Specific condition]\n- **Watch level:** [Specific price]\n- **Confirmation needed:** [Specific signal]\n- **Maximum wait time:** [Time period]\n\n### If SCALP trade shows ⏳ WAIT:\n- **Wait for:** [Specific condition]\n- **Watch level:** [Specific price]\n- **Confirmation needed:** [Specific signal]\n- **Maximum wait time:** [Time period]\n\n## 📊 KEY LEVELS TO MONITOR\n\n**Support Levels:**\n- Level 1: [Price] - [Significance]\n- Level 2: [Price] - [Significance]\n- Level 3: [Price] - [Significance]\n\n**Resistance Levels:**\n- Level 1: [Price] - [Significance]\n- Level 2: [Price] - [Significance]\n- Level 3: [Price] - [Significance]\n\n**Fibonacci Levels:**\n- 0.236: [Price]\n- 0.382: [Price]\n- 0.5: [Price]\n- 0.618: [Price]\n- 0.786: [Price]\n\n## 🔍 CURRENT MARKET STATE\n\n**Trend Direction:** [Bullish/Bearish/Neutral]\n**Momentum:** [Strong/Weak/Neutral]\n**Volatility:** [High/Medium/Low]\n**RSI Status:** 4H: [Value] | 1H: [Value] | 15M: [Value]\n\n## ⚠️ RISK MANAGEMENT\n\n**Position Size:** [Percentage of account]\n**Max Risk per Trade:** [Percentage]\n**Correlation Check:** [Any correlated positions]\n\n## 🎯 RECOMMENDED ACTION\n\n**IMMEDIATE:** [What to do right now]\n**TODAY:** [What to monitor today]\n**THIS WEEK:** [What to watch this week]\n\nIf ALL trades show ❌ NOT AVAILABLE, provide specific conditions that would make each trade type viable and estimated timeframes for when to check again.`
       });
       setResults(r => ({ ...r, finalSuggestion }));
       setProgress(100);
@@ -482,7 +563,10 @@ Focus ONLY on precise execution details for the trade setup identified in the hi
                     <div className="bg-white dark:bg-neutral-700 rounded-lg p-4">
                       <h5 className="font-semibold text-blue-800 dark:text-blue-300 mb-2">Reasoning</h5>
                       <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none">
-                        <ReactMarkdown>
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={components}
+                        >
                           {reasoning}
                         </ReactMarkdown>
                       </div>
@@ -509,7 +593,7 @@ Focus ONLY on precise execution details for the trade setup identified in the hi
             <div className="bg-white dark:bg-neutral-700 rounded-lg p-5 shadow-sm">
               <h4 className="font-semibold text-blue-600 dark:text-blue-400 mb-3">4H Analysis</h4>
               <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none">
-                <ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {results.analysis4h}
                 </ReactMarkdown>
               </div>
@@ -520,7 +604,7 @@ Focus ONLY on precise execution details for the trade setup identified in the hi
             <div className="bg-white dark:bg-neutral-700 rounded-lg p-5 shadow-sm">
               <h4 className="font-semibold text-blue-600 dark:text-blue-400 mb-3">1H Analysis</h4>
               <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none">
-                <ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {results.analysis1h}
                 </ReactMarkdown>
               </div>
@@ -531,7 +615,7 @@ Focus ONLY on precise execution details for the trade setup identified in the hi
             <div className="bg-white dark:bg-neutral-700 rounded-lg p-5 shadow-sm">
               <h4 className="font-semibold text-blue-600 dark:text-blue-400 mb-3">15min Analysis</h4>
               <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none">
-                <ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {results.analysis15m}
                 </ReactMarkdown>
               </div>
@@ -542,7 +626,7 @@ Focus ONLY on precise execution details for the trade setup identified in the hi
             <div className="bg-white dark:bg-neutral-700 rounded-lg p-5 shadow-sm">
               <h4 className="font-semibold text-blue-600 dark:text-blue-400 mb-3">5min Analysis</h4>
               <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none">
-                <ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {results.analysis5m}
                 </ReactMarkdown>
               </div>

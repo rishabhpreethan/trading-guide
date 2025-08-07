@@ -1,18 +1,77 @@
-// Gemini Vision API call helper using @google/generative-ai SDK
-// WARNING: For production, move API calls and secrets to a backend endpoint or serverless function!
+// Gemini Vision API call helper with rate limiting and caching
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import PQueue from "p-queue";
+import { LRUCache } from 'lru-cache';
+import { v4 as uuidv4 } from 'uuid';
 
-const GEMINI_API_KEY = "AIzaSyAE8p_vWov7LUqDW-V4o6NT5hXoSg8A8tk";
-// Using gemini-1.5-flash as gemini-pro-vision was deprecated on July 12, 2024
+// Configuration
+const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
 const MODEL_NAME = "gemini-1.5-flash";
+const MAX_RETRIES = 3;
+const RATE_LIMIT_DELAY = 1000; // 1 second between requests
 
-// Initialize the Google Generative AI with your API key
+// Initialize Gemini client
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-console.log("Initializing Gemini API with model:", MODEL_NAME);
+// Create a queue for rate limiting
+const apiQueue = new PQueue({
+  concurrency: 1, // Process one request at a time
+  interval: 1000, // 1 second between requests
+  intervalCap: 5, // 5 requests per second (adjust based on your quota)
+  carryoverConcurrencyCount: true,
+});
+
+// Response cache (1 hour TTL, max 100 entries)
+const responseCache = new LRUCache<string, string>({
+  max: 100,
+  ttl: 60 * 60 * 1000, // 1 hour
+  ttlAutopurge: true,
+});
+
+// Track active requests to prevent duplicates
+const activeRequests = new Map<string, Promise<string>>();
+
+// Helper to generate a unique cache key for requests
+function generateCacheKey(file: File, prompt: string): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const fileContent = reader.result as string;
+      // Create a hash of file content and prompt for cache key
+      const data = JSON.stringify({ 
+        content: fileContent.substring(0, 1000), // First 1000 chars for hash
+        prompt: prompt.substring(0, 200), // First 200 chars of prompt
+        size: file.size,
+        name: file.name,
+        type: file.type,
+        lastModified: file.lastModified
+      });
+      
+      // Use Buffer for safe base64 encoding in Node.js
+      let hash: string;
+      if (typeof window === 'undefined') {
+        // Node.js environment
+        hash = Buffer.from(data).toString('base64');
+      } else {
+        // Browser environment - use TextEncoder if available, fallback to btoa with encodeURIComponent
+        try {
+          hash = window.btoa(unescape(encodeURIComponent(data)));
+        } catch (e) {
+          // Fallback to simple hash if encoding fails
+          hash = Array.from(data).reduce((acc, char) => {
+            return acc + char.charCodeAt(0).toString(16);
+          }, '');
+        }
+      }
+      
+      resolve(`gemini:${hash}`);
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 // Helper to convert File to base64 string
-function fileToBase64(file: File): Promise<string> {
+async function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
@@ -33,23 +92,13 @@ function imageToGeminiParts(imageBase64: string, mimeType: string) {
   ];
 }
 
-// Main function to analyze a chart image using Gemini Vision
-export async function analyzeChartWithGemini({ image, prompt }: { image: File; prompt: string }): Promise<string> {
-  console.log("Starting chart analysis with Gemini Vision");
-  if (!image) throw new Error("No image provided for analysis");
-  
+// Function to execute Gemini API call with retry logic
+async function executeGeminiRequest(image: File, prompt: string, attempt = 1): Promise<string> {
   try {
-    console.log("Converting image to base64...");
     const imageBase64 = await fileToBase64(image);
-    console.log("Image converted successfully");
-    
-    console.log("Creating Gemini parts...");
     const imageParts = imageToGeminiParts(imageBase64, image.type);
-    
-    console.log("Getting Gemini model...");
     const model = genAI.getGenerativeModel({ model: MODEL_NAME });
     
-    console.log("Sending request to Gemini API...");
     const result = await model.generateContent({
       contents: [
         {
@@ -62,14 +111,72 @@ export async function analyzeChartWithGemini({ image, prompt }: { image: File; p
       ],
     });
     
-    console.log("Received response from Gemini API");
-    // SDK v0.6.0+ returns response as result.response.text()
-    const text = await result.response.text();
-    console.log("Analysis complete");
-    return text || "No analysis returned from Gemini.";
-  } catch (err: unknown) {
-    console.error("Gemini Vision API error:", err);
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    throw new Error("Gemini Vision API error: " + errorMessage);
+    return await result.response.text() || "No analysis returned from Gemini.";
+  } catch (error: any) {
+    // Handle rate limiting (429) or server errors (5xx)
+    const status = error?.response?.status;
+    const isRateLimit = status === 429 || (status >= 500 && status < 600);
+    
+    if (isRateLimit && attempt <= MAX_RETRIES) {
+      // Exponential backoff: 2^attempt * 1000ms
+      const delay = Math.pow(2, attempt) * 1000;
+      console.warn(`Rate limited. Retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return executeGeminiRequest(image, prompt, attempt + 1);
+    }
+    
+    throw error;
   }
+}
+
+// Main function to analyze a chart image using Gemini Vision with caching and rate limiting
+export async function analyzeChartWithGemini({ 
+  image, 
+  prompt 
+}: { 
+  image: File; 
+  prompt: string 
+}): Promise<string> {
+  if (!image) throw new Error("No image provided for analysis");
+  
+  // Generate a unique cache key for this request
+  const cacheKey = await generateCacheKey(image, prompt);
+  
+  // Check cache first
+  const cachedResponse = responseCache.get(cacheKey);
+  if (cachedResponse) {
+    console.log("Returning cached response for:", cacheKey.substring(0, 50) + '...');
+    return cachedResponse;
+  }
+  
+  // Check for duplicate in-flight requests
+  if (activeRequests.has(cacheKey)) {
+    console.log("Request already in progress, returning existing promise");
+    return activeRequests.get(cacheKey)!;
+  }
+  
+  console.log("Starting new Gemini API request for:", cacheKey.substring(0, 50) + '...');
+  
+  // Create a promise for this request
+  const requestPromise = (async () => {
+    try {
+      // Add to queue for rate limiting
+      const response = await apiQueue.add(
+        () => executeGeminiRequest(image, prompt),
+        { throwOnTimeout: true }
+      );
+      
+      // Cache the successful response
+      responseCache.set(cacheKey, response);
+      return response;
+    } finally {
+      // Clean up the active request
+      activeRequests.delete(cacheKey);
+    }
+  })();
+  
+  // Store the promise for de-duplication
+  activeRequests.set(cacheKey, requestPromise);
+  
+  return requestPromise;
 }

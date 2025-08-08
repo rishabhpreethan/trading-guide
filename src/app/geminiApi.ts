@@ -5,7 +5,8 @@ import { LRUCache } from 'lru-cache';
 import { v4 as uuidv4 } from 'uuid';
 
 // Configuration
-const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+// const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+const GEMINI_API_KEY = "AIzaSyAE8p_vWov7LUqDW-V4o6NT5hXoSg8A8tk";
 const MODEL_NAME = "gemini-1.5-flash";
 const MAX_RETRIES = 3;
 const RATE_LIMIT_DELAY = 1000; // 1 second between requests
